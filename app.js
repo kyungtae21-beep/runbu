@@ -1,4 +1,4 @@
-import {gap,recovery,conflicts,weekPlan,dateValue,timeSeconds,personalBests} from './logic.js';
+import {gap,recovery,conflicts,weekPlan,dateValue,timeSeconds,personalBests} from './logic.js?v=20261104-2';
 const $=s=>document.querySelector(s),escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 function offset(n){const d=dateValue(today);d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);}
