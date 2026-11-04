@@ -18,3 +18,13 @@ export function personalBests(races,today){
     return {km,race:finished[0]||null};
   });
 }
+
+export function nutritionGuide(height,weight,runKm=0){
+  if(!Number.isFinite(height)||!Number.isFinite(weight)||height<100||height>230||weight<25||weight>250)return null;
+  const long=runKm>=10,carb=long?[5,7]:runKm>0?[3,5]:[3,4];
+  return {bmi:Math.round(weight/(height/100)**2*10)/10,protein:[Math.round(weight*1.2),Math.round(weight*1.6)],carbs:carb.map(x=>Math.round(weight*x))};
+}
+export function weightChange(entries){
+  const sorted=entries.filter(x=>Number.isFinite(x.weight)).slice().sort((a,b)=>a.date.localeCompare(b.date));
+  return sorted.length>1?Math.round((sorted.at(-1).weight-sorted[0].weight)*10)/10:null;
+}

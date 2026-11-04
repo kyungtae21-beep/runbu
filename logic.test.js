@@ -17,3 +17,13 @@ test('PB는 거리별로 실제 완주 기록을 비교하고 미래 대회·목
  assert.equal(best.find(x=>x.km===10).race.id,'b');assert.equal(best.find(x=>x.km===21.1).race.id,'c');assert.equal(best.find(x=>x.km===5).race,null);
  records[1].result='00:55:00';assert.equal(personalBests(records,'2026-11-04').find(x=>x.km===10).race.id,'a');
 });
+
+import {nutritionGuide,weightChange} from './logic.js';
+test('키·체중 범위를 검증하고 체중·훈련량에 따라 영양 범위를 계산한다',()=>{
+ assert.equal(nutritionGuide(0,70),null);assert.equal(nutritionGuide(175,NaN),null);
+ const a=nutritionGuide(175,70,0),b=nutritionGuide(175,72,16);
+ assert.deepEqual(a.protein,[84,112]);assert.deepEqual(b.carbs,[360,504]);assert.equal(a.bmi,22.9);
+});
+test('체중 변화는 입력 순서가 아닌 측정 날짜를 기준으로 계산한다',()=>{
+ assert.equal(weightChange([{date:'2026-11-04',weight:69},{date:'2026-10-01',weight:70.2}]),-1.2);assert.equal(weightChange([{date:'2026-11-04',weight:69}]),null);
+});
