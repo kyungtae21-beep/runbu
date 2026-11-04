@@ -28,3 +28,13 @@ export function weightChange(entries){
   const sorted=entries.filter(x=>Number.isFinite(x.weight)).slice().sort((a,b)=>a.date.localeCompare(b.date));
   return sorted.length>1?Math.round((sorted.at(-1).weight-sorted[0].weight)*10)/10:null;
 }
+
+export function groupRacesByYear(races,{descendingDates=false}={}){
+  const years=new Map();
+  for(const race of races){const year=race.date.slice(0,4);if(!years.has(year))years.set(year,[]);years.get(year).push(race);}
+  return [...years.entries()].sort(([a],[b])=>b.localeCompare(a)).map(([year,items])=>({year,races:items.slice().sort((a,b)=>descendingDates?b.date.localeCompare(a.date):a.date.localeCompare(b.date))}));
+}
+export function raceTimeline(races,today){
+  const past=r=>r.date<today||(r.date===today&&timeSeconds(r.result)!==null);
+  return {upcoming:races.filter(r=>!past(r)),past:races.filter(past)};
+}

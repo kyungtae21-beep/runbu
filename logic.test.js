@@ -27,3 +27,14 @@ test('키·체중 범위를 검증하고 체중·훈련량에 따라 영양 범�
 test('체중 변화는 입력 순서가 아닌 측정 날짜를 기준으로 계산한다',()=>{
  assert.equal(weightChange([{date:'2026-11-04',weight:69},{date:'2026-10-01',weight:70.2}]),-1.2);assert.equal(weightChange([{date:'2026-11-04',weight:69}]),null);
 });
+
+import {groupRacesByYear,raceTimeline} from './logic.js';
+test('레이스는 연도별로 묶고 원본 데이터를 변경하지 않는다',()=>{
+ const races=[{date:'2025-12-01',id:'a'},{date:'2026-10-01',id:'b'},{date:'2025-01-01',id:'c'}];
+ const groups=groupRacesByYear(races);assert.deepEqual(groups.map(g=>g.year),['2026','2025']);assert.deepEqual(groups[1].races.map(r=>r.id),['c','a']);assert.deepEqual(races.map(r=>r.id),['a','b','c']);
+ assert.equal(groupRacesByYear(races,{descendingDates:true})[1].races[0].id,'a');
+});
+test('지난 대회와 남은 대회를 분리하고 오늘 완주한 대회도 지난 목록에 포함한다',()=>{
+ const timeline=raceTimeline([{id:'old',date:'2025-01-01'},{id:'today',date:'2026-11-04'},{id:'done',date:'2026-11-04',result:'01:50:00'},{id:'next',date:'2027-01-01'}],'2026-11-04');
+ assert.deepEqual(timeline.upcoming.map(r=>r.id),['today','next']);assert.deepEqual(timeline.past.map(r=>r.id),['old','done']);
+});
