@@ -1,4 +1,4 @@
-import {orderedCrew} from './crew-order.js?v=20261105-15';
+import {orderedCrew} from './crew-order.js?v=20261105-16';
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const num=n=>Number(n.toFixed(2)).toLocaleString('ko-KR');
