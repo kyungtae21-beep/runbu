@@ -11,11 +11,16 @@ export function createCrewStore(path){
  const insertHistory=db.prepare('INSERT INTO monthly_history(name,month,km,goal) VALUES(?,?,?,?) ON CONFLICT(name,month) DO NOTHING');
  db.exec('BEGIN');try{for(const row of mileageHistory2026)insertHistory.run(row.name,row.month,row.km,row.goal);db.exec('COMMIT');}catch(error){db.exec('ROLLBACK');db.close();throw error;}
  db.exec(`CREATE TABLE IF NOT EXISTS crew_roster(id TEXT PRIMARY KEY,name TEXT UNIQUE NOT NULL);CREATE TABLE IF NOT EXISTS crew_runs(id TEXT PRIMARY KEY,member TEXT REFERENCES crew_roster(id),date TEXT NOT NULL,km REAL NOT NULL);CREATE TABLE IF NOT EXISTS crew_goals(member TEXT REFERENCES crew_roster(id),month TEXT NOT NULL,km REAL NOT NULL,PRIMARY KEY(member,month));`);
+ db.exec('CREATE TABLE IF NOT EXISTS crew_races(id TEXT PRIMARY KEY,member TEXT NOT NULL REFERENCES crew_roster(id),payload TEXT NOT NULL);');
  const rosterNames=[...new Set(mileageHistory2026.map(r=>r.name))];
  const addRoster=db.prepare('INSERT INTO crew_roster VALUES(?,?) ON CONFLICT(name) DO NOTHING');
  for(const [i,name] of rosterNames.entries())addRoster.run('crew-'+(i+1),name);
  const safe=m=>m&&({id:m.id,name:m.name});
  return {
+ listRaces(){return db.prepare('SELECT r.id,r.member,r.payload,m.name AS memberName FROM crew_races r JOIN crew_roster m ON m.id=r.member').all().map(({payload,...r})=>({...JSON.parse(payload),...r})).sort((a,b)=>a.date.localeCompare(b.date));},
+ saveRace(member,id,payload){if(id)return db.prepare('UPDATE crew_races SET payload=? WHERE id=? AND member=?').run(JSON.stringify(payload),id,member).changes>0;db.prepare('INSERT INTO crew_races VALUES(?,?,?)').run(randomBytes(16).toString('hex'),member,JSON.stringify(payload));return true;},
+ deleteRace(member,id){return db.prepare('DELETE FROM crew_races WHERE id=? AND member=?').run(id,member).changes>0;},
+
  roster(){return db.prepare('SELECT id,name FROM crew_roster ORDER BY rowid').all();},
  publicBoard(month){return db.prepare('SELECT id,name FROM crew_roster ORDER BY rowid').all().map(m=>{
  const history=db.prepare('SELECT km,goal FROM monthly_history WHERE name=? AND month=?').get(m.name,month);

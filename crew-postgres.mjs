@@ -25,6 +25,8 @@ export async function createPostgresStore(connectionString,{pool:providedPool}={
  CREATE TABLE IF NOT EXISTS runbu.monthly_history(name TEXT NOT NULL,month TEXT NOT NULL,km DOUBLE PRECISION,goal DOUBLE PRECISION NOT NULL,PRIMARY KEY(name,month));
  CREATE TABLE IF NOT EXISTS runbu.crew_runs(id TEXT PRIMARY KEY,member TEXT NOT NULL REFERENCES runbu.crew_roster(id),date TEXT NOT NULL,km DOUBLE PRECISION NOT NULL CHECK(km>0 AND km<=500));
  CREATE TABLE IF NOT EXISTS runbu.crew_goals(member TEXT NOT NULL REFERENCES runbu.crew_roster(id),month TEXT NOT NULL,km DOUBLE PRECISION NOT NULL CHECK(km>0 AND km<=10000),PRIMARY KEY(member,month));
+ CREATE TABLE IF NOT EXISTS runbu.crew_races(id TEXT PRIMARY KEY,member TEXT NOT NULL REFERENCES runbu.crew_roster(id),payload TEXT NOT NULL);
+ ALTER TABLE runbu.crew_races ENABLE ROW LEVEL SECURITY;
  CREATE INDEX IF NOT EXISTS crew_runs_member_date ON runbu.crew_runs(member,date);
  ALTER TABLE runbu.crew_roster ENABLE ROW LEVEL SECURITY;
  ALTER TABLE runbu.monthly_history ENABLE ROW LEVEL SECURITY;
@@ -37,6 +39,9 @@ export async function createPostgresStore(connectionString,{pool:providedPool}={
  }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
  }catch(error){await pool.end();throw error;}
  return {
+ async listRaces(){return (await pool.query('SELECT r.id,r.member,r.payload,m.name AS "memberName" FROM runbu.crew_races r JOIN runbu.crew_roster m ON m.id=r.member')).rows.map(({payload,...r})=>({...JSON.parse(payload),...r})).sort((a,b)=>a.date.localeCompare(b.date));},
+ async saveRace(member,id,payload){if(id)return (await pool.query('UPDATE runbu.crew_races SET payload=$1 WHERE id=$2 AND member=$3',[JSON.stringify(payload),id,member])).rowCount>0;await pool.query('INSERT INTO runbu.crew_races VALUES($1,$2,$3)',[randomBytes(16).toString('hex'),member,JSON.stringify(payload)]);return true;},
+ async deleteRace(member,id){return (await pool.query('DELETE FROM runbu.crew_races WHERE id=$1 AND member=$2',[id,member])).rowCount>0;},
  async roster(){return (await pool.query('SELECT id,name FROM runbu.crew_roster ORDER BY position')).rows;},
  async publicBoard(month){
  const client=await pool.connect();try{

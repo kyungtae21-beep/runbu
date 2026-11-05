@@ -34,3 +34,9 @@ test('pre-registered public roster links monthly history and persists new distan
  store.savePublicRun(a.id,null,'2026-10-31',2);assert.equal(store.publicBoard('2026-10')[0].monthlyTotal,153);store.close();store=createCrewStore(path);assert.equal(store.roster().length,7);assert.equal(store.publicBoard('2026-11')[0].goal,300);assert.equal(store.publicBoard('2026-11')[0].runs.length,2);assert.ok(store.deletePublicRun(a.id,run.id));
  }finally{store.close();await rm(dir,{recursive:true,force:true});}
 });
+
+
+test('shared races keep member names, survive restart and reject mismatched member edits',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'runbu-races-'));const path=join(dir,'crew.sqlite');let store=createCrewStore(path);
+ try{const member=store.roster()[0],race={name:'함께 달리기',date:'2027-03-01',km:10,location:'서울',goal:'01:00',result:'',note:''};store.saveRace(member.id,null,race);const saved=store.listRaces()[0];assert.equal(saved.memberName,'박경태');assert.equal(store.saveRace('crew-2',saved.id,race),false);assert.equal(store.deleteRace('crew-2',saved.id),false);store.close();store=createCrewStore(path);assert.equal(store.listRaces()[0].name,race.name);assert.equal(store.saveRace(member.id,saved.id,{...race,name:'수정된 대회'}),true);assert.equal(store.listRaces()[0].name,'수정된 대회');assert.equal(store.deleteRace(member.id,saved.id),true);}finally{store.close();await rm(dir,{recursive:true,force:true});}
+});
