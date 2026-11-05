@@ -1,5 +1,5 @@
-import {sharedRacePage,sharedRaceSummary,startSharedRaces,sharedRecordsPage,sharedPBPage} from './shared-races.js?v=20261105-14';
-import {crewHome,startCrew} from './crew.js?v=20261105-14';
+import {sharedRacePage,sharedRaceSummary,startSharedRaces,sharedRecordsPage,sharedPBPage} from './shared-races.js?v=20261105-15';
+import {crewHome,startCrew} from './crew.js?v=20261105-15';
 import {weatherCities,raceCity,forecastEligibility,weatherDescription,fetchRaceForecast} from './weather.js?v=20261104-6';
 import {gap,recovery,conflicts,weekPlan,dateValue,timeSeconds,personalBests,nutritionGuide,weightChange,groupRacesByYear,raceTimeline} from './logic.js?v=20261104-6';
 const $=s=>document.querySelector(s),escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

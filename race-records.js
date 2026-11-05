@@ -17,3 +17,10 @@ export function crewPersonalBests(races,members,today){
  candidates.sort((a,b)=>raceSeconds(a.result)-raceSeconds(b.result)||a.date.localeCompare(b.date)||a.id.localeCompare(b.id));
  return {km,race:candidates[0]||null};})}));
 }
+
+export function calendarRaceGroups(races){
+ const groups=new Map();
+ for(const race of races){const key=race.date+'\u0000'+race.name.trim().normalize('NFKC').replace(/\s+/g,' ').toLowerCase();
+ if(!groups.has(key))groups.set(key,{name:race.name.trim(),date:race.date,members:new Set()});groups.get(key).members.add(race.member);}
+ return [...groups.values()].map(g=>({...g,count:g.members.size}));
+}
