@@ -1,3 +1,4 @@
+import {orderedCrew} from './crew-order.js';
 import {mileageHistory2026} from './mileage-history.mjs';
 import {DatabaseSync} from 'node:sqlite';
 import {randomBytes,scryptSync,timingSafeEqual,createHash} from 'node:crypto';
@@ -15,14 +16,21 @@ export function createCrewStore(path){
  const rosterNames=[...new Set(mileageHistory2026.map(r=>r.name))];
  const addRoster=db.prepare('INSERT INTO crew_roster VALUES(?,?) ON CONFLICT(name) DO NOTHING');
  for(const [i,name] of rosterNames.entries())addRoster.run('crew-'+(i+1),name);
+ db.exec('CREATE TABLE IF NOT EXISTS app_migrations(id TEXT PRIMARY KEY);');
+ db.exec('BEGIN');try{
+ if(!db.prepare('SELECT id FROM app_migrations WHERE id=?').get('2026-10-park-final-200')){
+ db.prepare('UPDATE monthly_history SET km=200 WHERE name=? AND month=?').run('박경태','2026-10');
+ db.prepare('INSERT INTO app_migrations VALUES(?)').run('2026-10-park-final-200');}
+ db.exec('COMMIT');}catch(error){db.exec('ROLLBACK');db.close();throw error;}
  const safe=m=>m&&({id:m.id,name:m.name});
  return {
+ saveRaceResult(member,id,result,note,today){return db.prepare("UPDATE crew_races SET payload=json_set(payload,'$.result',?,'$.note',?) WHERE id=? AND member=? AND json_extract(payload,'$.date')<=?").run(result,note,id,member,today).changes>0;},
  listRaces(){return db.prepare('SELECT r.id,r.member,r.payload,m.name AS memberName FROM crew_races r JOIN crew_roster m ON m.id=r.member').all().map(({payload,...r})=>({...JSON.parse(payload),...r})).sort((a,b)=>a.date.localeCompare(b.date));},
  saveRace(member,id,payload){if(id)return db.prepare('UPDATE crew_races SET payload=? WHERE id=? AND member=?').run(JSON.stringify(payload),id,member).changes>0;db.prepare('INSERT INTO crew_races VALUES(?,?,?)').run(randomBytes(16).toString('hex'),member,JSON.stringify(payload));return true;},
  deleteRace(member,id){return db.prepare('DELETE FROM crew_races WHERE id=? AND member=?').run(id,member).changes>0;},
 
- roster(){return db.prepare('SELECT id,name FROM crew_roster ORDER BY rowid').all();},
- publicBoard(month){return db.prepare('SELECT id,name FROM crew_roster ORDER BY rowid').all().map(m=>{
+ roster(){return orderedCrew(db.prepare('SELECT id,name FROM crew_roster ORDER BY rowid').all());},
+ publicBoard(month){return orderedCrew(db.prepare('SELECT id,name FROM crew_roster ORDER BY rowid').all()).map(m=>{
  const history=db.prepare('SELECT km,goal FROM monthly_history WHERE name=? AND month=?').get(m.name,month);
  const runs=db.prepare('SELECT id,date,km FROM crew_runs WHERE member=? AND substr(date,1,7)=? ORDER BY date DESC,id').all(m.id,month);
  const fallback=db.prepare('SELECT goal FROM monthly_history WHERE name=? ORDER BY month DESC LIMIT 1').get(m.name)?.goal||0;

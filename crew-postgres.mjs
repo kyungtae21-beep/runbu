@@ -1,3 +1,4 @@
+import {crewMemberOrder} from './crew-order.js';
 import pg from 'pg';
 import {randomBytes} from 'node:crypto';
 import {readFileSync} from 'node:fs';
@@ -21,6 +22,8 @@ export async function createPostgresStore(connectionString,{pool:providedPool}={
  // Serialize concurrent initializers. All tables are private to the application.
  await client.query('SELECT pg_advisory_xact_lock(726862001)');
  await client.query(`CREATE SCHEMA IF NOT EXISTS runbu;
+ CREATE TABLE IF NOT EXISTS runbu.app_migrations(id TEXT PRIMARY KEY);
+ ALTER TABLE runbu.app_migrations ENABLE ROW LEVEL SECURITY;
  CREATE TABLE IF NOT EXISTS runbu.crew_roster(id TEXT PRIMARY KEY,name TEXT UNIQUE NOT NULL,position INTEGER NOT NULL);
  CREATE TABLE IF NOT EXISTS runbu.monthly_history(name TEXT NOT NULL,month TEXT NOT NULL,km DOUBLE PRECISION,goal DOUBLE PRECISION NOT NULL,PRIMARY KEY(name,month));
  CREATE TABLE IF NOT EXISTS runbu.crew_runs(id TEXT PRIMARY KEY,member TEXT NOT NULL REFERENCES runbu.crew_roster(id),date TEXT NOT NULL,km DOUBLE PRECISION NOT NULL CHECK(km>0 AND km<=500));
@@ -35,10 +38,14 @@ export async function createPostgresStore(connectionString,{pool:providedPool}={
  const names=[...new Set(mileageHistory2026.map(r=>r.name))];
  for(const [i,name] of names.entries())await client.query('INSERT INTO runbu.crew_roster VALUES($1,$2,$3) ON CONFLICT DO NOTHING',['crew-'+(i+1),name,i]);
  for(const row of mileageHistory2026)await client.query('INSERT INTO runbu.monthly_history VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING',[row.name,row.month,row.km,row.goal]);
+ for(const [i,name] of crewMemberOrder.entries())await client.query('UPDATE runbu.crew_roster SET position=$1 WHERE name=$2',[i,name]);
+ const correction=await client.query('INSERT INTO runbu.app_migrations VALUES($1) ON CONFLICT DO NOTHING RETURNING id',['2026-10-park-final-200']);
+ if(correction.rows.length)await client.query('UPDATE runbu.monthly_history SET km=200 WHERE name=$1 AND month=$2',['박경태','2026-10']);
  await client.query('COMMIT');
  }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
  }catch(error){await pool.end();throw error;}
  return {
+ async saveRaceResult(member,id,result,note,today){return (await pool.query("UPDATE runbu.crew_races SET payload=(payload::jsonb || jsonb_build_object('result',$1::text,'note',$2::text))::text WHERE id=$3 AND member=$4 AND payload::jsonb->>'date'<=$5",[result,note,id,member,today])).rowCount>0;},
  async listRaces(){return (await pool.query('SELECT r.id,r.member,r.payload,m.name AS "memberName" FROM runbu.crew_races r JOIN runbu.crew_roster m ON m.id=r.member')).rows.map(({payload,...r})=>({...JSON.parse(payload),...r})).sort((a,b)=>a.date.localeCompare(b.date));},
  async saveRace(member,id,payload){if(id)return (await pool.query('UPDATE runbu.crew_races SET payload=$1 WHERE id=$2 AND member=$3',[JSON.stringify(payload),id,member])).rowCount>0;await pool.query('INSERT INTO runbu.crew_races VALUES($1,$2,$3)',[randomBytes(16).toString('hex'),member,JSON.stringify(payload)]);return true;},
  async deleteRace(member,id){return (await pool.query('DELETE FROM runbu.crew_races WHERE id=$1 AND member=$2',[id,member])).rowCount>0;},

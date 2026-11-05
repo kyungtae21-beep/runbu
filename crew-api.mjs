@@ -1,3 +1,4 @@
+import {raceSeconds,normalizeGoal} from './race-records.js';
 import {createPostgresStore} from './crew-postgres.mjs';
 import {join} from 'node:path';
 export async function crewAPI(){
@@ -15,11 +16,16 @@ export async function crewAPI(){
  if(url.pathname==='/api/board'&&req.method==='GET'&&validMonth(month)){send(200,{members:await store.publicBoard(month)});return true;}
  if(!['/api/goal','/api/runs','/api/races'].includes(url.pathname)&&!url.pathname.startsWith('/api/runs/')&&!url.pathname.startsWith('/api/races/')){send(404,{error:'지원하지 않는 요청입니다.'});return true;}
  if(!(await store.roster()).some(m=>m.id===data.member)){send(400,{error:'등록된 크루 회원을 선택해 주세요.'});return true;}
+ if(/^\/api\/races\/[^/]+\/result$/.test(url.pathname)&&req.method==='POST'){
+ const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+ if((data.result!==''&&raceSeconds(data.result)===null)||typeof data.note!=='string'||data.note.length>500){send(400,{error:'완주 기록은 00:00:01 이상의 시:분:초로 입력해 주세요.'});return true;}
+ const ok=await store.saveRaceResult(data.member,url.pathname.split('/')[3],data.result,data.note,today);send(ok?200:404,ok?{ok:true}:{error:'대회 당일부터 선택한 회원의 기록을 입력할 수 있습니다.'});return true;
+ }
  if(url.pathname==='/api/races'&&req.method==='POST'){
- const {name,date,location,goal='',result='',note=''}=data;const km=Number(data.km);
+ const {name,date,location,note=''}=data;const km=Number(data.km);const goal=typeof data.goal==='string'?normalizeGoal(data.goal):'';const existing=data.id?(await store.listRaces()).find(r=>r.id===data.id&&r.member===data.member):null;const result=data.result===undefined?(existing?.result||''):data.result;
  const validDate=typeof date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(date)&&Number.isFinite(Date.parse(date))&&new Date(date+'T00:00:00Z').toISOString().slice(0,10)===date;
  const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
- if(!validDate||typeof name!=='string'||!name.trim()||name.length>80||typeof location!=='string'||!location.trim()||location.length>80||![5,10,21.1,42.195].includes(km)||typeof goal!=='string'||(goal&&!/^(?!00:00$)\d{1,2}:[0-5]\d$/.test(goal))||typeof result!=='string'||(result&&(!/^(?!00:00:00$)\d{1,2}:[0-5]\d:[0-5]\d$/.test(result)||date>today))||typeof note!=='string'||note.length>500||(data.id!==undefined&&typeof data.id!=='string')){send(400,{error:'대회 이름·날짜·거리·장소·기록을 확인해 주세요.'});return true;}
+ if(!validDate||typeof name!=='string'||!name.trim()||name.length>80||typeof location!=='string'||!location.trim()||location.length>80||![5,10,21.1,42.195].includes(km)||typeof goal!=='string'||(goal&&raceSeconds(goal)===null)||typeof result!=='string'||(result&&(!/^(?!00:00:00$)\d{1,2}:[0-5]\d:[0-5]\d$/.test(result)||date>today))||typeof note!=='string'||note.length>500||(data.id!==undefined&&typeof data.id!=='string')){send(400,{error:'대회 이름·날짜·거리·장소·기록을 확인해 주세요.'});return true;}
  const ok=await store.saveRace(data.member,data.id,{name:name.trim(),date,km,location:location.trim(),goal,result,note});send(ok?200:404,ok?{ok:true}:{error:'선택한 회원의 대회를 찾지 못했습니다.'});return true;
  }
  if(url.pathname.startsWith('/api/races/')&&req.method==='DELETE'){const ok=await store.deleteRace(data.member,url.pathname.slice(11));send(ok?200:404,ok?{ok:true}:{error:'선택한 회원의 대회를 찾지 못했습니다.'});return true;}

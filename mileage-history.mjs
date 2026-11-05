@@ -1,6 +1,6 @@
 // User-provided monthly summaries. null means distance was not supplied.
 export const mileageHistory2026 = [
- {name:'박경태',distances:[174,180,189,167,238,213,201,263,199,151],goals:[210,210,210,210,210,250,250,250,280,280]},
+ {name:'박경태',distances:[174,180,189,167,238,213,201,263,199,200],goals:[210,210,210,210,210,250,250,250,280,280]},
  {name:'장경자',distances:[7,10,null,null,null,null,null,null,null,null],goals:Array(10).fill(30)},
  {name:'김애진',distances:Array(10).fill(null),goals:Array(10).fill(40)},
  {name:'이시광',distances:Array(10).fill(null),goals:Array(10).fill(40)},
