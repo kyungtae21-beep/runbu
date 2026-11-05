@@ -23,3 +23,14 @@ test('2026 historical mileage preserves 70 monthly rows, unknown distances and m
  store.close();store=createCrewStore(path);assert.equal(store.board('2026-10').filter(m=>m.historical).length,7);assert.equal(store.board('2026-10').find(m=>m.id===member.id).runs[0].km,5);
  }finally{store.close();await rm(dir,{recursive:true,force:true});}
 });
+
+test('pre-registered public roster links monthly history and persists new distances without signup',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'runbu-public-'));const path=join(dir,'crew.sqlite');let store=createCrewStore(path);
+ try{
+ assert.deepEqual(store.roster().map(m=>m.name),['박경태','장경자','김애진','이시광','홍곤표','설미경','도은진']);
+ const a=store.roster()[0],b=store.roster()[1];assert.equal(store.publicBoard('2026-10').length,7);assert.equal(store.publicBoard('2026-10')[0].monthlyTotal,151);assert.equal(store.publicBoard('2026-10')[1].monthlyTotal,null);assert.equal(store.publicBoard('2026-11')[0].goal,280);
+ store.savePublicRun(a.id,null,'2026-11-01',5);store.savePublicRun(a.id,null,'2026-11-01',3.5);store.publicGoal(a.id,'2026-11',300);
+ const run=store.publicBoard('2026-11')[0].runs[0];assert.equal(store.savePublicRun(b.id,run.id,'2026-11-02',20),false);assert.equal(store.deletePublicRun(b.id,run.id),false);assert.equal(store.savePublicRun(a.id,run.id,'2026-11-02',6),true);
+ store.savePublicRun(a.id,null,'2026-10-31',2);assert.equal(store.publicBoard('2026-10')[0].monthlyTotal,153);store.close();store=createCrewStore(path);assert.equal(store.roster().length,7);assert.equal(store.publicBoard('2026-11')[0].goal,300);assert.equal(store.publicBoard('2026-11')[0].runs.length,2);assert.ok(store.deletePublicRun(a.id,run.id));
+ }finally{store.close();await rm(dir,{recursive:true,force:true});}
+});

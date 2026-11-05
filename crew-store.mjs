@@ -10,8 +10,22 @@ export function createCrewStore(path){
  db.exec('CREATE TABLE IF NOT EXISTS monthly_history(name TEXT NOT NULL,month TEXT NOT NULL,km REAL,goal REAL NOT NULL,PRIMARY KEY(name,month));');
  const insertHistory=db.prepare('INSERT INTO monthly_history(name,month,km,goal) VALUES(?,?,?,?) ON CONFLICT(name,month) DO NOTHING');
  db.exec('BEGIN');try{for(const row of mileageHistory2026)insertHistory.run(row.name,row.month,row.km,row.goal);db.exec('COMMIT');}catch(error){db.exec('ROLLBACK');db.close();throw error;}
+ db.exec(`CREATE TABLE IF NOT EXISTS crew_roster(id TEXT PRIMARY KEY,name TEXT UNIQUE NOT NULL);CREATE TABLE IF NOT EXISTS crew_runs(id TEXT PRIMARY KEY,member TEXT REFERENCES crew_roster(id),date TEXT NOT NULL,km REAL NOT NULL);CREATE TABLE IF NOT EXISTS crew_goals(member TEXT REFERENCES crew_roster(id),month TEXT NOT NULL,km REAL NOT NULL,PRIMARY KEY(member,month));`);
+ const rosterNames=[...new Set(mileageHistory2026.map(r=>r.name))];
+ const addRoster=db.prepare('INSERT INTO crew_roster VALUES(?,?) ON CONFLICT(name) DO NOTHING');
+ for(const [i,name] of rosterNames.entries())addRoster.run('crew-'+(i+1),name);
  const safe=m=>m&&({id:m.id,name:m.name});
  return {
+ roster(){return db.prepare('SELECT id,name FROM crew_roster ORDER BY rowid').all();},
+ publicBoard(month){return db.prepare('SELECT id,name FROM crew_roster ORDER BY rowid').all().map(m=>{
+ const history=db.prepare('SELECT km,goal FROM monthly_history WHERE name=? AND month=?').get(m.name,month);
+ const runs=db.prepare('SELECT id,date,km FROM crew_runs WHERE member=? AND substr(date,1,7)=? ORDER BY date DESC,id').all(m.id,month);
+ const fallback=db.prepare('SELECT goal FROM monthly_history WHERE name=? ORDER BY month DESC LIMIT 1').get(m.name)?.goal||0;
+ return {...m,runs,goal:db.prepare('SELECT km FROM crew_goals WHERE member=? AND month=?').get(m.id,month)?.km??history?.goal??fallback,historical:!!history,monthlyTotal:history?(history.km===null&&!runs.length?null:(history.km??0)+runs.reduce((s,r)=>s+r.km,0)):null,baseline:history?.km??null};});},
+ savePublicRun(member,id,date,km){if(id)return db.prepare('UPDATE crew_runs SET date=?,km=? WHERE id=? AND member=?').run(date,km,id,member).changes>0;db.prepare('INSERT INTO crew_runs VALUES(?,?,?,?)').run(randomBytes(16).toString('hex'),member,date,km);return true;},
+ deletePublicRun(member,id){return db.prepare('DELETE FROM crew_runs WHERE id=? AND member=?').run(id,member).changes>0;},
+ publicGoal(member,month,km){db.prepare('INSERT INTO crew_goals VALUES(?,?,?) ON CONFLICT(member,month) DO UPDATE SET km=excluded.km').run(member,month,km);},
+
  register(name,email,password){const salt=randomBytes(16).toString('hex'),id=randomBytes(16).toString('hex');try{db.prepare('INSERT INTO members VALUES(?,?,?,?,?)').run(id,name,email,scryptSync(password,salt,64).toString('hex'),salt);}catch(e){if(e.code?.includes('SQLITE')&&db.prepare('SELECT id FROM members WHERE email=?').get(email))throw Error('이미 가입된 이메일입니다.');throw e;}return {id,name};},
  login(email,password){const m=db.prepare('SELECT * FROM members WHERE email=?').get(email);const actual=scryptSync(password,m?.salt||'dummy-salt',64);return m&&timingSafeEqual(actual,Buffer.from(m.password,'hex'))?safe(m):null;},
  session(m){const token=randomBytes(32).toString('hex');db.prepare('DELETE FROM sessions WHERE expires<?').run(Date.now());db.prepare('INSERT INTO sessions VALUES(?,?,?)').run(hash(token),m.id,Date.now()+7*86400000);return token;},
