@@ -1,0 +1,22 @@
+import test from 'node:test';
+import {PGlite} from '@electric-sql/pglite';
+import {createPostgresStore,postgresOptions} from './crew-postgres.mjs';
+import assert from 'node:assert/strict';
+test('PostgreSQL storage preserves history, edits and goals on reinitialization',async()=>{
+const db=new PGlite();
+const query=async(sql,params)=>{
+ // pg supports multi-statement schema initialization; PGlite exposes it via exec.
+ if(sql.includes('CREATE SCHEMA')){await db.exec(sql);return {rows:[],rowCount:0};}
+ const r=await db.query(sql,params);return {...r,rowCount:r.affectedRows??0};
+};
+const pool={query,connect:async()=>({query,release(){}}),end:async()=>{}};
+try{
+ let store=await createPostgresStore('postgresql://unused',{pool});
+ assert.equal((await store.roster()).length,7);let board=await store.publicBoard('2026-10');assert.equal(board[0].monthlyTotal,151);assert.equal(board[1].monthlyTotal,null);assert.equal(board.reduce((s,r)=>s+(r.monthlyTotal??0),0),368);
+ const member=board[0].id;await store.savePublicRun(member,null,'2026-11-01',5.5);await store.publicGoal(member,'2026-11',300);board=await store.publicBoard('2026-11');assert.equal(board[0].goal,300);assert.equal(board[0].runs[0].km,5.5);const id=board[0].runs[0].id;assert.equal(await store.savePublicRun(board[1].id,id,'2026-11-02',8),false);assert.equal(await store.deletePublicRun(board[1].id,id),false);assert.equal(await store.savePublicRun(member,id,'2026-11-02',8),true);
+ store=await createPostgresStore('postgresql://unused',{pool});board=await store.publicBoard('2026-11');assert.equal(board.length,7);assert.equal(board[0].runs[0].km,8);assert.equal(board[0].goal,300);assert.equal(await store.deletePublicRun(member,id),true);assert.equal((await db.query('SELECT count(*)::integer n FROM runbu.monthly_history')).rows[0].n,70);
+ const options=postgresOptions('postgresql://user:password@example.com:5432/db?sslmode=require');assert.equal(options.ssl.rejectUnauthorized,true);assert.ok(!options.connectionString.includes('sslmode'));assert.equal(postgresOptions('postgresql://localhost/db').ssl,false);
+ console.log('PASS: real PostgreSQL engine schema/seed, 7 members, 70 histories, nulls, goals, CRUD, ownership, repeat initialization, TLS policy');
+}finally{await db.close();}
+
+});

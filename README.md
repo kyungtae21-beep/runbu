@@ -98,3 +98,16 @@ Node.js 24에서 `npm start`로 실행하며 외부 패키지 설치는 없습�
 기존 가입 계정과 개인 기록 테이블은 삭제하지 않지만 새 공용 화면에 자동 병합하지 않습니다. 이전 가입·로그인 API는 비활성화됐습니다. 대회·신체·식사 기능은 계속 개인 브라우저 저장 방식입니다. 사전 회원과 월간 이력은 최초 실행 시 중복 없이 추가하며 기존 DB 값을 덮어쓰지 않습니다.
 
 `npm test`로 과거 기록, 회원 7명 등록, 월별 합계, 목표, 일별 거리 수정·삭제 및 재시작 후 데이터 보존을 검증합니다. 임시 DB의 실제 HTTP 요청으로 로그인 없는 조회·저장과 회원 ID·날짜 검증을 확인했습니다.
+
+
+## Render 무료 서버 + Supabase PostgreSQL
+
+Render Environment에 `DATABASE_URL`로 Supabase **Connect → Direct → Session pooler**의 PostgreSQL 연결 주소를 저장합니다. 비밀번호를 포함하므로 서버 환경변수로만 설정하고 프런트엔드·GitHub·채팅에 공개하지 마세요. 비밀번호의 특수문자는 URI용 퍼센트 인코딩이 필요합니다.
+
+`DATABASE_URL`이 있으면 PostgreSQL을 선택하며 `RUNBU_DB_PATH`와 로컬 파일은 사용하지 않습니다. 연결 실패 시 SQLite로 전환하지 않고 시작을 중단하여 기록 분산·손실을 방지합니다. Render의 기존 `RUNBU_DB_PATH`는 제거해도 됩니다. `DATABASE_URL`이 없는 개인 PC는 기존 SQLite 방식으로 실행합니다. 기존 PC/서버 SQLite에 직접 입력한 신규 기록은 PostgreSQL로 자동 이전하지 않습니다.
+
+Render Build Command는 `npm ci`, Start Command는 `npm start`, Node.js는 24로 설정합니다. 외부 PostgreSQL을 쓰면 Render 영속 디스크가 필요하지 않습니다. 최초 실행 시 `runbu` 전용 스키마에 테이블과 회원 7명·월간 이력 70건을 등록하고 기존 값은 덮어쓰지 않습니다. 앱이 만든 테이블은 RLS를 켜고 브라우저용 API 권한을 열지 않습니다. Supabase의 기본 데이터베이스 관리자 연결을 서버에서 사용하세요. 가입 없이 모든 방문자가 앱의 공용 기록 API를 사용할 수 있다는 제품 정책은 그대로입니다.
+
+원격 PostgreSQL은 TLS와 인증서 검증을 사용합니다. 공식 연결 서버의 인증서가 기본 신뢰 저장소에 없다면 Supabase가 제공하는 공식 CA 파일을 서버에 설치하고 `PGSSLROOTCERT`에 해당 파일 경로를 설정합니다. 검증을 끄지 마세요. 연결 오류 로그에는 비밀번호·연결 주소를 출력하지 않고 오류 코드만 출력합니다.
+
+`npm ci` 후 `npm test`에서 SQLite 및 PostgreSQL 엔진(PGlite) 저장 로직을 검증합니다. 실제 Supabase 네트워크/권한/인증 성공은 Render에서 배포 후 확인해야 합니다. 무료 서비스의 휴면·용량·연결 제한은 각 제공자의 정책을 확인하세요.

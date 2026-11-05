@@ -1,5 +1,6 @@
 import {crewAPI} from './crew-api.mjs';
-const handleCrew=crewAPI();
+let handleCrew;
+try{handleCrew=await crewAPI();}catch(error){const code=typeof error.code==='string'&&/^[A-Z0-9_]+$/.test(error.code)?error.code:'UNKNOWN';console.error('RUNBU database error code: '+code);console.error('RUNBU database initialization failed. Check DATABASE_URL, database password, Session pooler host/port, and TLS certificate trust.');process.exit(1);}
 import http from 'node:http';
 import {readFile} from 'node:fs/promises';
 const files={'/crew.js':['crew.js','text/javascript; charset=utf-8'],'/':['index.html','text/html; charset=utf-8'],'/app.js':['app.js','text/javascript; charset=utf-8'],'/styles.css':['styles.css','text/css; charset=utf-8'],'/logic.js':['logic.js','text/javascript; charset=utf-8'],'/weather.js':['weather.js','text/javascript; charset=utf-8']};
