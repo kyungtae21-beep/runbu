@@ -9,8 +9,10 @@ export function postgresOptions(connectionString){
  if(!['postgres:','postgresql:'].includes(url.protocol))throw Error('DATABASE_URL must be a PostgreSQL connection URL');
  // Enforce certificate verification even if a pasted URI requests weaker SSL.
  for(const key of ['sslmode','sslcert','sslkey','sslrootcert','uselibpqcompat'])url.searchParams.delete(key);
+ const inlineCA=process.env.PGSSLROOTCERT_CONTENT?.replace(/\\n/g,'\n');
+ const ca=inlineCA||(process.env.PGSSLROOTCERT?readFileSync(process.env.PGSSLROOTCERT,'utf8'):undefined);
  const local=['localhost','127.0.0.1','[::1]'].includes(url.hostname);
- return {connectionString:url.toString(),max:3,connectionTimeoutMillis:15000,idleTimeoutMillis:30000,ssl:local?false:{rejectUnauthorized:true,...(process.env.PGSSLROOTCERT?{ca:readFileSync(process.env.PGSSLROOTCERT,'utf8')}:{})}};
+ return {connectionString:url.toString(),max:3,connectionTimeoutMillis:15000,idleTimeoutMillis:30000,ssl:local?false:{rejectUnauthorized:true,...(ca?{ca}:{})}};
 }
 export async function createPostgresStore(connectionString,{pool:providedPool}={}){
  const pool=providedPool||new pg.Pool(postgresOptions(connectionString));
@@ -36,9 +38,9 @@ export async function createPostgresStore(connectionString,{pool:providedPool}={
  ALTER TABLE runbu.crew_runs ENABLE ROW LEVEL SECURITY;
  ALTER TABLE runbu.crew_goals ENABLE ROW LEVEL SECURITY;`);
  const names=[...new Set(mileageHistory2026.map(r=>r.name))];
- for(const [i,name] of names.entries())await client.query('INSERT INTO runbu.crew_roster VALUES($1,$2,$3) ON CONFLICT DO NOTHING',['crew-'+(i+1),name,i]);
- for(const row of mileageHistory2026)await client.query('INSERT INTO runbu.monthly_history VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING',[row.name,row.month,row.km,row.goal]);
- for(const [i,name] of crewMemberOrder.entries())await client.query('UPDATE runbu.crew_roster SET position=$1 WHERE name=$2',[i,name]);
+ await client.query('INSERT INTO runbu.crew_roster SELECT * FROM unnest($1::text[],$2::text[],$3::integer[]) ON CONFLICT DO NOTHING',[names.map((_,i)=>'crew-'+(i+1)),names,names.map((_,i)=>i)]);
+ await client.query('INSERT INTO runbu.monthly_history SELECT * FROM unnest($1::text[],$2::text[],$3::double precision[],$4::double precision[]) ON CONFLICT DO NOTHING',[mileageHistory2026.map(r=>r.name),mileageHistory2026.map(r=>r.month),mileageHistory2026.map(r=>r.km),mileageHistory2026.map(r=>r.goal)]);
+ await client.query('UPDATE runbu.crew_roster AS r SET position=o.position FROM unnest($1::text[],$2::integer[]) AS o(name,position) WHERE r.name=o.name',[crewMemberOrder,crewMemberOrder.map((_,i)=>i)]);
  const correction=await client.query('INSERT INTO runbu.app_migrations VALUES($1) ON CONFLICT DO NOTHING RETURNING id',['2026-10-park-final-200']);
  if(correction.rows.length)await client.query('UPDATE runbu.monthly_history SET km=200 WHERE name=$1 AND month=$2',['박경태','2026-10']);
  await client.query('COMMIT');

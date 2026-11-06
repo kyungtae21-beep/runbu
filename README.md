@@ -129,3 +129,14 @@ Render Build Command는 `npm ci`, Start Command는 `npm start`, Node.js는 24로
 **나의 대회 기록**에서 회원 이름을 선택하면 한국 시간 기준 대회 당일부터 기존 일정과 같은 대회 정보를 표시합니다. 별도의 중복 일정은 만들지 않습니다. 완주 기록을 저장·수정·삭제하면 왼쪽 **대회 PB** 메뉴의 5K·10K·하프·풀 최고 기록을 다시 계산합니다. 미래 일정과 목표 시간은 PB에 포함하지 않습니다. 삭제 시 대회 일정은 유지합니다. 앱을 계속 켜 둔 상태에서도 한국 날짜가 바뀌면 표시 대상을 다시 계산합니다. 다른 기기의 최신 변경은 새로고침 버튼으로 가져옵니다.
 
 기존 브라우저에 저장된 개인 대회 기록은 ‘나의 대회 기록’ 아래 접힌 보관 영역에서 그대로 확인할 수 있고, 공유 기록과 자동 병합하지 않습니다. 운영 중인 Supabase는 배포 후 초기화 과정에서 필요한 변경을 적용합니다.
+
+
+## Vercel + 기존 Supabase (Render 깨우기 화면 없이 접속)
+
+GitHub 저장소를 Vercel의 새 프로젝트로 Import합니다. Framework는 Other, Node.js는 24.x, Build Command는 `npm run build`, Output Directory는 `public`, Install Command는 `npm ci`입니다. `vercel.json`에 같은 값이 지정돼 있습니다. 9개 브라우저 파일만 정적 출력에 포함되고 서버 코드·인증서는 공개하지 않습니다. `/api/*`는 Node 서버리스 함수에서 처리합니다. API 초기화와 PostgreSQL 연결 풀은 같은 함수 인스턴스에서 재사용합니다.
+
+Production 환경변수에는 기존 Render에서 사용하는 **같은** `DATABASE_URL`을 넣습니다. 인증서는 Render Secret File의 PEM 내용 전체를 Vercel의 `PGSSLROOTCERT_CONTENT` 값에 붙여넣습니다. BEGIN/END 줄을 포함하며 실제 줄바꿈 또는 `\n` 형식을 지원합니다. Render의 `/etc/secrets/...` 파일 경로는 Vercel에서 사용할 수 없으므로 `PGSSLROOTCERT` 경로를 복사하지 마세요. 비밀번호가 포함된 DB URL은 서버 환경변수에만 저장하고 채팅이나 GitHub에 공개하지 않습니다.
+
+Supabase에는 동일 스키마와 테이블을 사용하며 DB 이동·초기화는 없습니다. 초기화는 기존 값을 덮어쓰지 않는 방식입니다. Vercel에서 DATABASE_URL이 없으면 임시 SQLite로 전환하지 않고 API에 설정 오류를 표시합니다. 기존 Render는 새 사이트의 조회·저장 확인 전까지 유지하세요. 전환 후 공유 주소는 Vercel이 발급하는 실제 주소로 바뀝니다.
+
+화면 파일은 Render 서버 휴면과 무관하게 제공되지만 서버리스 초기 실행, DB 조회, 네트워크 지연은 남습니다. 무료 플랜의 개인/비상업적 이용 조건과 사용량, Supabase 휴면·용량 정책은 가입 시 확인하세요. 실제 Vercel 배포 성공은 사용자 계정에서 확인해야 합니다. 테스트는 API 파싱/공유 데이터, 인증서 검증 유지, 공개 파일 목록을 포함합니다.
